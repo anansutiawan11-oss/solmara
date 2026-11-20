@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOLMARA — Open-World Crime in a Sun-Soaked Coastal City</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1024; font-family: "Segoe UI", system-ui, sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .hidden { display: none !important; }
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; text-shadow: 0 2px 4px rgba(0,0,0,.7); }
+  #hud .panel { background: rgba(10,8,20,.45); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; backdrop-filter: blur(2px); }
+  #topleft { position: absolute; top: 14px; left: 14px; padding: 10px 14px; min-width: 210px; }
+  #cash { font-size: 26px; font-weight: 800; letter-spacing: .5px; color: #7dff9a; }
+  #rank { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #ffd166; margin-top: 2px; }
+  #healthbar { margin-top: 8px; height: 10px; border-radius: 5px; background: rgba(255,255,255,.18); overflow: hidden; }
+  #healthfill { height: 100%; width: 100%; background: linear-gradient(90deg,#ff5d5d,#ff9a5d); transition: width .2s; }
+  #healthlabel { font-size: 11px; color: #ffb3b3; margin-top: 3px; letter-spacing: 1px; }
+  #topright { position: absolute; top: 14px; right: 14px; text-align: right; padding: 8px 12px; }
+  #stars { font-size: 26px; letter-spacing: 3px; color: #ffd166; }
+  #stars .off { color: rgba(255,255,255,.22); }
+  #wantedlabel { font-size: 11px; letter-spacing: 2px; color: #ff8a8a; }
+  #clock { font-size: 13px; color: #ffe9c9; margin-top: 2px; }
+  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 9px 18px; text-align: center; max-width: 46vw; }
+  #objtitle { font-size: 12px; letter-spacing: 2px; color: #ffd166; text-transform: uppercase; }
+  #objtext { font-size: 16px; font-weight: 700; }
+  #objdist { font-size: 12px; color: #cfe8ff; }
+  #bottomleft { position: absolute; left: 14px; bottom: 14px; padding: 8px 14px; }
+  #weapon { font-size: 17px; font-weight: 700; }
+  #ammo { font-size: 13px; color: #cfe8ff; }
+  #bottomright { position: absolute; right: 14px; bottom: 14px; text-align: right; }
+  #minimap { width: 216px; height: 216px; border-radius: 10px; border: 2px solid rgba(255,255,255,.25); background: #0c1220; box-shadow: 0 4px 18px rgba(0,0,0,.5); }
+  #speed { font-size: 30px; font-weight: 800; margin-top: 4px; }
+  #speed small { font-size: 13px; color: #cfe8ff; font-weight: 600; }
+  #radio { font-size: 12px; letter-spacing: 1px; color: #ffd166; }
+  #carhealth { font-size: 12px; color: #ffb3b3; }
+  #prompt { position: absolute; left: 50%; bottom: 21.5%; transform: translateX(-50%); padding: 8px 16px; font-size: 16px; font-weight: 700; background: rgba(10,8,20,.55); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; }
+  #prompt b { color: #ffd166; }
+  #dialogue { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); width: min(640px, 80vw); padding: 12px 18px; background: rgba(8,6,18,.72); border-left: 4px solid #ffd166; border-radius: 8px; }
+  #dlgname { font-size: 12px; letter-spacing: 2px; color: #ffd166; text-transform: uppercase; }
+  #dlgtext { font-size: 16px; line-height: 1.45; margin-top: 3px; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255,255,255,.9); box-shadow: 0 0 4px #000; }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { left: 0; top: 10px; width: 22px; height: 2px; }
+  #banner { position: absolute; left: 50%; top: 30%; transform: translate(-50%,-50%); text-align: center; }
+  #banner h1 { margin: 0; font-size: 52px; letter-spacing: 6px; color: #ffd166; text-shadow: 0 4px 0 rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.6); }
+  #banner p { margin: 6px 0 0; font-size: 20px; font-weight: 700; }
+  #damage { position: fixed; inset: 0; pointer-events: none; z-index: 4; box-shadow: inset 0 0 120px 40px rgba(255,0,0,.55); opacity: 0; transition: opacity .15s; }
+  #wantedflash { position: fixed; inset: 0; pointer-events: none; z-index: 3; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(255,30,30,.28) 100%); }
+  /* ---------- Overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(20,8,32,.55), rgba(8,4,16,.82)); }
+  .card { width: min(680px, 92vw); padding: 34px 40px; background: rgba(12,8,24,.88); border: 1px solid rgba(255,209,102,.35); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.6); text-align: center; }
+  .card h1 { margin: 0; font-size: 64px; letter-spacing: 10px; color: #ffd166; text-shadow: 0 4px 0 #7a2d12, 0 10px 30px rgba(0,0,0,.7); }
+  .card h2 { margin: 2px 0 0; font-size: 15px; letter-spacing: 5px; color: #ff9a5d; text-transform: uppercase; }
+  .card p.story { margin: 18px 0 4px; font-size: 16px; line-height: 1.6; color: #f2e8d5; text-align: left; }
+  .card .controls { margin: 16px 0 4px; font-size: 13.5px; line-height: 1.9; color: #cfe8ff; text-align: left; columns: 2; }
+  .card .controls b { color: #ffd166; }
+  .btnrow { margin-top: 22px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  button { pointer-events: auto; cursor: pointer; font: inherit; font-size: 16px; font-weight: 800; letter-spacing: 1px; color: #1a1024; background: #ffd166; border: none; border-radius: 10px; padding: 12px 26px; box-shadow: 0 4px 0 #b98a1e; }
+  button:hover { filter: brightness(1.08); }
+  button.secondary { background: transparent; color: #ffd166; border: 2px solid #ffd166; box-shadow: none; }
+  .saveinfo { margin-top: 14px; font-size: 13px; color: #9fb6d8; }
+  .big { font-size: 84px !important; letter-spacing: 12px; }
+  .red { color: #ff5d5d !important; }
+  .green { color: #7dff9a !important; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="SOLMARA: open-world crime game. Drive, steal cars, outrun the police and run missions across the coastal city of Solmara."></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+<div id="damage"></div>
+<div id="wantedflash"></div>
+
+<div id="hud" class="hidden">
+  <div id="topleft" class="panel">
+    <div id="cash">$0</div>
+    <div id="rank">Wheelman</div>
+    <div id="healthbar"><div id="healthfill"></div></div>
+    <div id="healthlabel">HEALTH</div>
+  </div>
+  <div id="topright" class="panel">
+    <div id="stars"></div>
+    <div id="wantedlabel">WANTED</div>
+    <div id="clock">18:42 · SOLMARA</div>
+  </div>
+  <div id="objective" class="panel">
+    <div id="objtitle">Mission</div>
+    <div id="objtext">Explore Solmara</div>
+    <div id="objdist"></div>
+  </div>
+  <div id="bottomleft" class="panel">
+    <div id="weapon">Fists</div>
+    <div id="ammo"></div>
+  </div>
+  <div id="bottomright">
+    <canvas id="minimap" width="216" height="216"></canvas>
+    <div id="speed" class="hidden">0 <small>km/h</small></div>
+    <div id="radio">SOL FM · 101.2</div>
+    <div id="carhealth"></div>
+  </div>
+  <div id="prompt" class="hidden"></div>
+  <div id="dialogue" class="hidden"><div id="dlgname"></div><div id="dlgtext"></div></div>
+  <div id="crosshair" class="hidden"></div>
+  <div id="banner" class="hidden"><h1 id="bannerTitle"></h1><p id="bannerSub"></p></div>
+</div>
+
+<div id="title-screen" class="overlay">
+  <div class="card">
+    <h1>SOLMARA</h1>
+    <h2>Open-world crime · a sun-soaked coastal city</h2>
+    <p class="story">Mara Voss came home to Solmara to find her brother — and found a city owned by
+    Silas Kane. One stolen car at a time, she is taking it back. Drive the beachfront, steal what
+    you need, lose the Solmara PD, and run seven story missions from wheelman to street legend.</p>
+    <div class="controls">
+      <div><b>W A S D</b> — move / drive</div>
+      <div><b>Mouse</b> — look around (click to lock)</div>
+      <div><b>E</b> — steal / enter car · talk · save</div>
+      <div><b>Shift</b> — sprint · <b>Space</b> — jump / handbrake</div>
+      <div><b>F</b> — punch · <b>Click</b> — shoot · <b>R</b> — reload</div>
+      <div><b>1 / 2</b> — fists / pistol · <b>Q</b> — radio station</div>
+      <div><b>C</b> — camera · <b>M</b> — mute · <b>Esc</b> — pause</div>
+      <div><b>H</b> — start / abandon current mission</div>
+    </div>
+    <div class="btnrow">
+      <button id="btn-continue" class="hidden">CONTINUE</button>
+      <button id="btn-new">NEW GAME</button>
+    </div>
+    <div class="saveinfo" id="saveinfo">Progress saves automatically after every mission — and at the safehouse (press E at the blue door).</div>
+  </div>
+</div>
+
+<div id="pause-screen" class="overlay hidden">
+  <div class="card">
+    <h1 style="font-size:44px">PAUSED</h1>
+    <p class="story" id="pause-stats" style="text-align:center"></p>
+    <div class="btnrow">
+      <button id="btn-resume">RESUME</button>
+      <button id="btn-save" class="secondary">SAVE GAME</button>
+      <button id="btn-quit" class="secondary">QUIT TO TITLE</button>
+    </div>
+  </div>
+</div>
+
+<div id="busted-screen" class="overlay hidden">
+  <div class="card">
+    <h1 class="big red">BUSTED</h1>
+    <p class="story" style="text-align:center">The Solmara PD hauled you in. You posted bail and lost some cash — the city is still yours to take back.</p>
+    <div class="btnrow"><button id="btn-busted">BACK TO THE STREETS</button></div>
+  </div>
+</div>
+
+<div id="wasted-screen" class="overlay hidden">
+  <div class="card">
+    <h1 class="big red">WASTED</h1>
+    <p class="story" style="text-align:center">You woke up at the safehouse, patched up and poorer. Kane's crew is still out there.</p>
+    <div class="btnrow"><button id="btn-wasted">BACK TO THE STREETS</button></div>
+  </div>
+</div>
+
+<div id="end-screen" class="overlay hidden">
+  <div class="card">
+    <h1 class="green" style="font-size:52px">STREET LEGEND</h1>
+    <h2>You took Solmara back</h2>
+    <p class="story">Kane's black limo is yours, his crew is scattered, and Tomas is safe. The beachfront
+    is yours now, Mara — every car, every street, every sunset. Keep driving: the city never closes.</p>
+    <div class="btnrow"><button id="btn-freeroam">FREE ROAM</button><button id="btn-endtitle" class="secondary">TITLE SCREEN</button></div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
