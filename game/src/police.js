@@ -1,8 +1,8 @@
-// The Solmara PD: a wanted level (0–5 stars), patrol cars that chase and ram,
-// foot cops who try to arrest Mara on foot, and a helicopter at 4+ stars.
-// Heat decays when no unit can see her.
+// The Solmara PD: a wanted level (0-5 stars), patrol cars that chase and ram,
+// foot cops who arrest Mara on foot and shoot at range, and a helicopter at
+// 4+ stars. Heat fades when no unit can see her.
 import * as THREE from 'three';
-import { clamp, damp, mulberry32, pick, range, angleDelta } from './utils.js';
+import { clamp, damp, mulberry32, angleDelta } from './utils.js';
 import { makeCarMesh } from './vehicles.js';
 import { makePersonMesh } from './peds.js';
 import { nearestNode, collideCircle } from './city.js';
@@ -12,11 +12,11 @@ export class Police {
     this.scene = scene;
     this.city = city;
     this.wanted = 0;
-    this.heatTimer = 0;      // time since last crime / sighting
-    this.arrest = 0;         // arrest progress 0..1
-    this.cars = [];          // {mesh, x, z, heading, speed, health}
-    this.cops = [];          // {mesh, x, z, heading, speed, health, down, shootAt}
-    this.heli = null;        // {group, rotor, x, z, y}
+    this.heatTimer = 0; // time since the last crime / sighting
+    this.arrest = 0; // arrest progress 0..1
+    this.cars = []; // {mesh, x, z, heading, speed, health, maxSpeed}
+    this.cops = []; // {mesh, x, z, heading, speed, health, down, shootAt, walkPhase}
+    this.heli = null; // {group, rotor, x, z, y}
     this.rng = mulberry32(99);
     this.sirenNear = 0;
     this.busted = false;
@@ -63,11 +63,16 @@ export class Police {
     const tail = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 4.6), bodyMat);
     tail.position.set(0, 0.3, -4.4);
     g.add(tail);
-    const rotor = new THREE.Mesh(new THREE.BoxGeometry(9.5, 0.08, 0.5), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+    const rotor = new THREE.Mesh(
+      new THREE.BoxGeometry(9.5, 0.08, 0.5),
+      new THREE.MeshLambertMaterial({ color: 0x222222 }),
+    );
     rotor.position.y = 1.1;
-    rotor.name = 'rotor';
     g.add(rotor);
-    const glass = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 1.6), new THREE.MeshPhongMaterial({ color: 0x9fd8ff, shininess: 140 }));
+    const glass = new THREE.Mesh(
+      new THREE.BoxGeometry(2.6, 1.0, 1.6),
+      new THREE.MeshPhongMaterial({ color: 0x9fd8ff, shininess: 140 }),
+    );
     glass.position.set(0, 0.2, 2.0);
     g.add(glass);
     // searchlight cone
@@ -84,7 +89,7 @@ export class Police {
   }
 
   update(dt, playerPos, playerInCar, playerSpeed, now, events) {
-    // --- spawn / despawn to match wanted level ---
+    // --- keep the force at the size the wanted level calls for ---
     const want = this.desiredCars();
     while (this.cars.length < want) {
       const node = nearestNode(this.city.nodes, playerPos.x, playerPos.z);
@@ -117,9 +122,10 @@ export class Police {
     let nearest = Infinity;
     let anyNear = false;
 
-    // --- police cars: chase, ram, block ---
+    // --- patrol cars: chase, ram, and pin a stopped player ---
     for (const c of this.cars) {
-      const dx = playerPos.x - c.x, dz = playerPos.z - c.z;
+      const dx = playerPos.x - c.x;
+      const dz = playerPos.z - c.z;
       const dist = Math.hypot(dx, dz);
       nearest = Math.min(nearest, dist);
       if (dist < 70) anyNear = true;
@@ -135,24 +141,22 @@ export class Police {
       c.mesh.position.set(c.x, 0, c.z);
       c.mesh.rotation.y = c.heading;
       for (const w of c.mesh.userData.wheels) w.rotation.x += (c.speed * dt) / 0.36;
-      // flashing light bar
-      const phase = Math.floor(now * 6) % 2 === 0;
+      // flashing light bar, alternating red / blue
+      const redPhase = Math.floor(now * 6) % 2 === 0;
       const r = c.mesh.getObjectByName('beaconR');
       const b = c.mesh.getObjectByName('beaconB');
-      if (r) r.material.color.setHex(phase ? 0xff2222 : 0x550000);
-      if (b) b.material.color.setHex(phase ? 0x112244 : 0x2266ff);
-      // ramming the player's car
+      if (r) r.material.color.setHex(redPhase ? 0xff2222 : 0x550000);
+      if (b) b.material.color.setHex(redPhase ? 0x112244 : 0x2266ff);
       if (playerInCar && dist < 3.9) {
         events.onRam && events.onRam(Math.abs(c.speed));
         c.speed *= 0.6;
       }
-      // busted: pinned by a police car while stopped
       if (playerInCar && dist < 4.5 && Math.abs(playerSpeed) < 1.2) {
         this.arrest += dt / 3;
       }
     }
 
-    // --- foot cops: run Mara down, shoot when she is armed and far ---
+    // --- foot cops: run Mara down, arrest up close, shoot at range ---
     for (const cop of this.cops) {
       if (cop.down > 0) {
         cop.down -= dt;
@@ -162,7 +166,8 @@ export class Police {
         }
         continue;
       }
-      const dx = playerPos.x - cop.x, dz = playerPos.z - cop.z;
+      const dx = playerPos.x - cop.x;
+      const dz = playerPos.z - cop.z;
       const dist = Math.hypot(dx, dz);
       nearest = Math.min(nearest, dist);
       if (dist < 70) anyNear = true;
@@ -183,21 +188,21 @@ export class Police {
       u.armR.rotation.x = swing * 0.6;
       cop.mesh.position.set(cop.x, 0, cop.z);
       cop.mesh.rotation.y = cop.heading;
-      // arrest on foot
       if (!playerInCar && dist < 2.6) this.arrest += dt / 2.5;
-      // shoot at range when wanted is high
       if (!playerInCar && dist > 8 && dist < 34 && this.wanted >= 2 && now - cop.shootAt > 1.6) {
         cop.shootAt = now;
         events.onCopShot && events.onCopShot(cop, dist);
       }
     }
-    if (this.cars.length === 0 && this.cops.length === 0) this.arrest = Math.max(0, this.arrest - dt * 0.5);
+    if (this.cars.length === 0 && this.cops.length === 0) {
+      this.arrest = Math.max(0, this.arrest - dt * 0.5);
+    }
     if (this.arrest >= 1 && !this.busted) {
       this.busted = true;
       events.onBusted && events.onBusted();
     }
 
-    // --- helicopter: hover over Mara, spotlight, blocks heat decay ---
+    // --- helicopter: hovers over Mara, spotlight on, heat never fades ---
     if (this.heli) {
       const h = this.heli;
       h.x = damp(h.x, playerPos.x, 0.8, dt);
@@ -209,7 +214,7 @@ export class Police {
       nearest = Math.min(nearest, 30);
     }
 
-    // --- heat decay ---
+    // --- heat decay: unseen for long enough and a star drops off ---
     this.sirenNear = nearest === Infinity ? 0 : clamp(1 - nearest / 90, 0, 1);
     if (this.wanted > 0) {
       if (!anyNear && !this.heli) {
@@ -227,7 +232,7 @@ export class Police {
     return { nearest, anyNear };
   }
 
-  /** Damage a cop or police car at a point. Returns 'cop' | 'car' | null. */
+  /** Damage a cop or a patrol car at a point. Returns 'cop' | 'car' | null. */
   hitAt(x, z, radius, damage) {
     for (const cop of this.cops) {
       if (cop.down > 0) continue;

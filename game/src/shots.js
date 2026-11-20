@@ -9,6 +9,7 @@ const STEP = 1 / 60;
 function driveInput() {
   return { forward: true, back: false, left: false, right: false, sprint: false, jump: false, handbrake: false };
 }
+
 function walkInput() {
   return { forward: true, back: false, left: false, right: false, sprint: true, jump: false, handbrake: false };
 }
@@ -74,10 +75,12 @@ export function stageShot(name, game, seed = 1) {
     simulate(game, 5, driveInput());
     // stage the chase into the frame: a roadblock cruiser ahead, the
     // helicopter hanging over the road in front of the limo.
-    const px = game.playerCar.x, pz = game.playerCar.z;
+    const px = game.playerCar.x;
+    const pz = game.playerCar.z;
     const block = game.police.cars[0];
     if (block) {
-      block.x = px - 5; block.z = pz - 38;
+      block.x = px - 5;
+      block.z = pz - 38;
       block.heading = 0;
       block.speed = 0;
       block.mesh.position.set(block.x, 0, block.z);
@@ -85,8 +88,9 @@ export function stageShot(name, game, seed = 1) {
     }
     if (game.police.heli) {
       const h = game.police.heli;
-      h.x = px + 24; h.z = pz - 32;
-      h.y = 15; // the update loop re-applies h.y every frame
+      h.x = px + 24;
+      h.z = pz - 32;
+      h.y = 15;
       h.group.position.set(h.x, h.y, h.z);
       h.group.rotation.y = Math.PI;
     }

@@ -1,5 +1,5 @@
-// Save game: localStorage. Autosaves after every mission, manual save at the
-// safehouse door (E) and from the pause menu.
+// Save game: one localStorage slot. Autosaved after each finished mission,
+// manually from the safehouse door (E) and from the pause menu.
 const KEY = 'solmara-save-v1';
 
 export function loadSave() {
@@ -7,10 +7,9 @@ export function loadSave() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (typeof data !== 'object' || !data) return null;
-    return data;
+    return typeof data === 'object' && data ? data : null;
   } catch {
-    return null;
+    return null; // corrupt save or storage unavailable: start fresh
   }
 }
 
@@ -24,5 +23,9 @@ export function writeSave(data) {
 }
 
 export function clearSave() {
-  try { localStorage.removeItem(KEY); } catch { /* private mode */ }
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // private mode or blocked storage — nothing to do
+  }
 }

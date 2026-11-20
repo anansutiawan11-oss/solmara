@@ -36,8 +36,13 @@ export class HUD {
     this.flashPhase = 0;
   }
 
-  show() { this.el('hud').classList.remove('hidden'); }
-  hide() { this.el('hud').classList.add('hidden'); }
+  show() {
+    this.el('hud').classList.remove('hidden');
+  }
+
+  hide() {
+    this.el('hud').classList.add('hidden');
+  }
 
   banner(title, sub, seconds = 3) {
     this.bannerTitle.textContent = title;
@@ -54,14 +59,19 @@ export class HUD {
   }
 
   prompt(html) {
-    if (!html) { this.promptEl.classList.add('hidden'); return; }
+    if (!html) {
+      this.promptEl.classList.add('hidden');
+      return;
+    }
     this.promptEl.innerHTML = html;
     this.promptEl.classList.remove('hidden');
   }
 
   damageFlash(strength = 1) {
     this.damageEl.style.opacity = String(0.35 + 0.65 * strength);
-    setTimeout(() => { this.damageEl.style.opacity = '0'; }, 160);
+    setTimeout(() => {
+      this.damageEl.style.opacity = '0';
+    }, 160);
   }
 
   update(game, now) {
@@ -72,7 +82,9 @@ export class HUD {
     this.rankEl.textContent = rankFor(game.cash);
     this.healthFill.style.width = Math.max(0, game.player.health) + '%';
     let stars = '';
-    for (let i = 0; i < 5; i++) stars += `<span class="${i < game.police.wanted ? '' : 'off'}">★</span>`;
+    for (let i = 0; i < 5; i++) {
+      stars += `<span class="${i < game.police.wanted ? '' : 'off'}">★</span>`;
+    }
     this.starsEl.innerHTML = stars;
     this.clockEl.textContent = `${clockString(game.clockSeconds)} · SOLMARA`;
     const m = game.missions.active;
@@ -81,7 +93,8 @@ export class HUD {
       this.objText.textContent = game.missions.stepLabel();
     } else {
       this.objTitle.textContent = game.missions.done >= 7 ? 'Free Roam' : 'No Active Mission';
-      this.objText.textContent = game.missions.done >= 7 ? 'Solmara is yours — press H for jobs' : 'Press H to start the next mission';
+      this.objText.textContent =
+        game.missions.done >= 7 ? 'Solmara is yours — press H for jobs' : 'Press H to start the next mission';
     }
     const obj = game.missions.objectivePos();
     if (obj) {
@@ -92,9 +105,12 @@ export class HUD {
     }
     const w = game.combat.weapon;
     this.weaponEl.textContent = w === 'pistol' ? 'Pistol' : 'Fists';
-    this.ammoEl.textContent = w === 'pistol'
-      ? (game.combat.reloading > 0 ? 'RELOADING…' : `Ammo ${game.combat.ammo} / 12 — R reload`)
-      : 'F — punch';
+    this.ammoEl.textContent =
+      w === 'pistol'
+        ? game.combat.reloading > 0
+          ? 'RELOADING…'
+          : `Ammo ${game.combat.ammo} / 12 — R reload`
+        : 'F — punch';
     this.crosshairEl.classList.toggle('hidden', !(w === 'pistol' && !game.inCar));
     if (game.inCar) {
       this.speedEl.classList.remove('hidden');
@@ -105,21 +121,20 @@ export class HUD {
       this.carHealthEl.textContent = '';
     }
     this.radioEl.textContent = game.audio.stationName();
-    // red pulse while wanted
+    // red pulse around the screen edge while wanted
     this.flashPhase += 0.016;
-    this.flashEl.style.opacity = game.police.wanted > 0
-      ? String(0.25 + 0.2 * Math.sin(this.flashPhase * 3))
-      : '0';
+    this.flashEl.style.opacity =
+      game.police.wanted > 0 ? String(0.25 + 0.2 * Math.sin(this.flashPhase * 3)) : '0';
     this.drawMinimap(game, now);
   }
 
   drawMinimap(game, now) {
     const g = this.map;
     const S = 216;
-    const half = 360; // world units shown
+    const half = 360; // world units shown across the map
     const toMap = (x, z) => [((x + half) / (half * 2)) * S, ((z + half) / (half * 2)) * S];
     g.clearRect(0, 0, S, S);
-    // ocean + beach
+    // sea, beach, city base
     g.fillStyle = '#0e2a3a';
     g.fillRect(0, 0, S, S);
     const [bx] = toMap(BEACH_X, 0);
@@ -141,55 +156,74 @@ export class HUD {
     g.lineWidth = 3;
     for (const c of ROADS) {
       const [x] = toMap(c, 0);
-      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, S); g.stroke();
+      g.beginPath();
+      g.moveTo(x, 0);
+      g.lineTo(x, S);
+      g.stroke();
       const [, y] = toMap(0, c);
-      g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke();
+      g.beginPath();
+      g.moveTo(0, y);
+      g.lineTo(S, y);
+      g.stroke();
     }
-    // safehouse
+    // safehouse marker
     const [sx, sy] = toMap(game.city.places.safehouse.x, game.city.places.safehouse.z);
     g.fillStyle = '#37e6ff';
     g.fillRect(sx - 3, sy - 3, 6, 6);
-    // mission target
+    // mission target: pulsing diamond + dashed route from the player
     const obj = game.missions.objectivePos();
     if (obj) {
       const [ox, oy] = toMap(obj.x, obj.z);
       const pulse = 5 + 2.5 * Math.sin(now * 5);
       g.fillStyle = '#ffd166';
       g.beginPath();
-      g.moveTo(ox, oy - pulse); g.lineTo(ox + pulse, oy); g.lineTo(ox, oy + pulse); g.lineTo(ox - pulse, oy);
-      g.closePath(); g.fill();
+      g.moveTo(ox, oy - pulse);
+      g.lineTo(ox + pulse, oy);
+      g.lineTo(ox, oy + pulse);
+      g.lineTo(ox - pulse, oy);
+      g.closePath();
+      g.fill();
+      const [px, py] = toMap(game.playerPos.x, game.playerPos.z);
       g.strokeStyle = 'rgba(255,209,102,0.5)';
       g.lineWidth = 1;
-      const [px, py] = toMap(game.playerPos.x, game.playerPos.z);
       g.setLineDash([4, 4]);
-      g.beginPath(); g.moveTo(px, py); g.lineTo(ox, oy); g.stroke();
+      g.beginPath();
+      g.moveTo(px, py);
+      g.lineTo(ox, oy);
+      g.stroke();
       g.setLineDash([]);
     }
-    // traffic
+    // traffic: white dots
     g.fillStyle = 'rgba(255,255,255,0.85)';
     for (const c of game.traffic.cars) {
       if (c.wrecked) continue;
       const [x, y] = toMap(c.x, c.z);
       g.fillRect(x - 1.5, y - 1.5, 3, 3);
     }
-    // police
+    // police: blinking red/blue dots, helicopter bigger
     const blink = Math.floor(now * 4) % 2 === 0;
     g.fillStyle = blink ? '#ff3b3b' : '#3b82ff';
     for (const c of game.police.cars) {
       const [x, y] = toMap(c.x, c.z);
-      g.beginPath(); g.arc(x, y, 3.4, 0, Math.PI * 2); g.fill();
+      g.beginPath();
+      g.arc(x, y, 3.4, 0, Math.PI * 2);
+      g.fill();
     }
     for (const c of game.police.cops) {
       if (c.down > 0) continue;
       const [x, y] = toMap(c.x, c.z);
-      g.beginPath(); g.arc(x, y, 2.4, 0, Math.PI * 2); g.fill();
+      g.beginPath();
+      g.arc(x, y, 2.4, 0, Math.PI * 2);
+      g.fill();
     }
     if (game.police.heli) {
       const [x, y] = toMap(game.police.heli.x, game.police.heli.z);
       g.fillStyle = '#ff3b3b';
-      g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill();
+      g.beginPath();
+      g.arc(x, y, 4.5, 0, Math.PI * 2);
+      g.fill();
     }
-    // player arrow
+    // player arrow, rotated to the heading
     const [px, py] = toMap(game.playerPos.x, game.playerPos.z);
     const heading = game.inCar ? game.playerCar.heading : game.player.heading;
     g.save();
@@ -199,10 +233,15 @@ export class HUD {
     g.strokeStyle = '#111';
     g.lineWidth = 1.5;
     g.beginPath();
-    g.moveTo(0, -7); g.lineTo(5, 6); g.lineTo(0, 3); g.lineTo(-5, 6);
-    g.closePath(); g.fill(); g.stroke();
+    g.moveTo(0, -7);
+    g.lineTo(5, 6);
+    g.lineTo(0, 3);
+    g.lineTo(-5, 6);
+    g.closePath();
+    g.fill();
+    g.stroke();
     g.restore();
-    // north + border
+    // north label + border
     g.fillStyle = 'rgba(255,255,255,0.8)';
     g.font = 'bold 11px sans-serif';
     g.fillText('N', 6, 14);

@@ -1,6 +1,6 @@
-// Story: seven missions for Mara Voss, from wheelman to street legend. Each
-// mission is a list of steps; the manager tracks the current step, shows the
-// objective, fires dialogue and pays out on completion.
+// Story: seven missions for Mara Voss, wheelman to street legend. Each mission
+// is a list of steps; the manager tracks the current step, shows the objective,
+// fires dialogue and pays out on completion.
 import { PLACES } from './city.js';
 
 export const MISSIONS = [
@@ -56,7 +56,7 @@ export const MISSIONS = [
   },
   {
     id: 'm6', title: 'Heat Wave', giver: 'Iris Duarte',
-    brief: 'Kane put a price on you. Three stars and climbing — lose them, or get to the safehouse. Do not get caught, Mara.',
+    brief: "Kane put a price on you. Three stars and climbing — lose them, or get to the safehouse. Do not get caught, Mara.",
     reward: 900,
     steps: [
       { type: 'escape', label: 'Lose the heat — reach the safehouse or drop to 0 stars', x: PLACES.safehouse.x, z: PLACES.safehouse.z, r: 8 },
@@ -64,7 +64,7 @@ export const MISSIONS = [
   },
   {
     id: 'm7', title: 'King of Solmara', giver: 'Tomas Voss',
-    brief: 'Kane is at the casino with his black limo out front. Take it. Every cop in Solmara will be on you — bring it home to the garage and this city is ours.',
+    brief: "Kane is at the casino with his black limo out front. Take it. Every cop in Solmara will be on you — bring it home to the garage and this city is ours.",
     reward: 1500,
     steps: [
       { type: 'steal', car: 'limo-black', x: PLACES.casino.x, z: PLACES.casino.z + 20, label: "Steal Kane's black limo at the casino" },
@@ -88,12 +88,14 @@ export function rankFor(cash) {
 export class MissionManager {
   constructor(game) {
     this.game = game;
-    this.active = null;   // {def, step, stepData}
-    this.done = 0;        // missions completed
-    this.race = null;     // race state
+    this.active = null; // {def, index, step, stepData}
+    this.done = 0; // missions completed
+    this.race = null; // race state
   }
 
-  get current() { return this.active ? this.active.def : null; }
+  get current() {
+    return this.active ? this.active.def : null;
+  }
 
   start(index) {
     const def = MISSIONS[index];
@@ -132,6 +134,7 @@ export class MissionManager {
       g.police.addHeat(3);
       g.events.dialogue('Iris Duarte', 'Three stars, Mara. Lose them or run for the safehouse — your call.');
     }
+    // heat that kicks in on a later step of the mission
     if (this.active.def.onStep === this.active.step) {
       if (this.active.def.id === 'm3') g.police.addHeat(1, true);
       if (this.active.def.id === 'm7') g.police.addHeat(4);
@@ -187,10 +190,11 @@ export class MissionManager {
     const g = this.game;
     if (!this.active) return;
     const s = this.active.def.steps[this.active.step];
-    const px = g.playerPos.x, pz = g.playerPos.z;
+    const px = g.playerPos.x;
+    const pz = g.playerPos.z;
     if (s.type === 'goto' || s.type === 'deliver') {
       const d = Math.hypot(px - s.x, pz - s.z);
-      if (s.type === 'deliver' && g.inCar) return; // must be on foot
+      if (s.type === 'deliver' && g.inCar) return; // the drop is on foot only
       if (d < s.r && (!s.inCar || g.inCar)) {
         g.audio.sfx('pickup');
         this.advance();
@@ -217,9 +221,12 @@ export class MissionManager {
         if (this.race.gate >= this.race.checkpoints.length) {
           const racersDone = this.race.racers.filter((r) => r.finished).length;
           this.race.place = racersDone === 0 ? 1 : racersDone + 1;
-          g.events.dialogue('Tomas Voss', this.race.place === 1
-            ? 'First across the line! The beachfront is ours tonight.'
-            : `P${this.race.place} — the pot is halved, but you finished. Rematch any time.`);
+          g.events.dialogue(
+            'Tomas Voss',
+            this.race.place === 1
+              ? 'First across the line! The beachfront is ours tonight.'
+              : `P${this.race.place} — the pot is halved, but you finished. Rematch any time.`,
+          );
           this.advance();
         } else {
           g.events.objective(this.active.def.title, this.stepLabel());

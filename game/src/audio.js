@@ -1,7 +1,6 @@
-// All sound is synthesized with WebAudio — no audio files. A tiny step sequencer
-// plays one of three radio stations, plus engine hum, sirens and one-shot effects.
-import { clamp } from './utils.js';
-
+// All sound is synthesized with WebAudio — no audio files. A tiny step
+// sequencer plays one of three radio stations, plus engine hum, sirens and
+// one-shot effects.
 const STATIONS = [
   {
     name: 'SOL FM · 101.2', bpm: 96, root: 55,
@@ -23,7 +22,9 @@ const STATIONS = [
   },
 ];
 
-function noteFreq(root, semis) { return root * Math.pow(2, semis / 12); }
+function noteFreq(root, semis) {
+  return root * Math.pow(2, semis / 12);
+}
 
 export class AudioEngine {
   constructor() {
@@ -42,7 +43,6 @@ export class AudioEngine {
     this.engineFilter = null;
     this.sirenOsc = null;
     this.sirenGain = null;
-    this.sirenOn = false;
   }
 
   /** Must be called from a user gesture. Safe to call repeatedly. */
@@ -81,7 +81,7 @@ export class AudioEngine {
     this.engineGain.connect(this.master);
     this.engineOsc.start();
     this.engineOsc2.start();
-    // Siren: triangle alternating between two tones.
+    // Siren: one triangle osc sweeping between two tones.
     this.sirenOsc = this.ctx.createOscillator();
     this.sirenOsc.type = 'triangle';
     this.sirenOsc.frequency.value = 750;
@@ -104,7 +104,9 @@ export class AudioEngine {
     return STATIONS[this.station].name;
   }
 
-  stationName() { return STATIONS[this.station].name; }
+  stationName() {
+    return STATIONS[this.station].name;
+  }
 
   startMusic() {
     if (this.timer || !this.ctx) return;
@@ -128,20 +130,18 @@ export class AudioEngine {
   playStep(st, step, t, stepDur) {
     const bar = Math.floor(step / 16);
     const s16 = step % 16;
-    // Kick on quarters.
-    if (s16 % 4 === 0) this.kick(t);
-    // Hat on off-eighths.
-    if (s16 % 2 === 1) this.hat(t);
-    // Bass line, eighth notes.
+    if (s16 % 4 === 0) this.kick(t); // kick on the quarters
+    if (s16 % 2 === 1) this.hat(t); // hat on the off-eighths
     const bassNote = st.bass[Math.floor(step / 2) % st.bass.length];
-    if (step % 2 === 0) this.tone(noteFreq(st.root, bassNote), t, stepDur * 1.8, 'sawtooth', 0.16, 240);
-    // Pad chord at each bar start.
+    if (step % 2 === 0) {
+      this.tone(noteFreq(st.root, bassNote), t, stepDur * 1.8, 'sawtooth', 0.16, 240);
+    }
     if (s16 === 0) {
+      // pad chord at each bar start
       for (const iv of st.chords[bar % st.chords.length]) {
         this.tone(noteFreq(st.root * 2, iv), t, stepDur * 16, 'sawtooth', 0.045, 900);
       }
     }
-    // Arpeggio sparkle, every other eighth.
     if (step % 2 === 0 && (bar + s16) % 3 !== 0) {
       const a = st.arp[(step / 2) % st.arp.length];
       this.tone(noteFreq(st.root * 4, a), t, stepDur * 0.9, 'square', 0.035, 2400);
@@ -159,8 +159,11 @@ export class AudioEngine {
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(vol, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(f); f.connect(g); g.connect(this.musicBus);
-    o.start(t); o.stop(t + dur + 0.05);
+    o.connect(f);
+    f.connect(g);
+    g.connect(this.musicBus);
+    o.start(t);
+    o.stop(t + dur + 0.05);
   }
 
   kick(t) {
@@ -171,8 +174,10 @@ export class AudioEngine {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.5, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-    o.connect(g); g.connect(this.musicBus);
-    o.start(t); o.stop(t + 0.2);
+    o.connect(g);
+    g.connect(this.musicBus);
+    o.start(t);
+    o.stop(t + 0.2);
   }
 
   hat(t) {
@@ -183,14 +188,17 @@ export class AudioEngine {
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     const f = this.ctx.createBiquadFilter();
-    f.type = 'highpass'; f.frequency.value = 6000;
+    f.type = 'highpass';
+    f.frequency.value = 6000;
     const g = this.ctx.createGain();
     g.gain.value = 0.12;
-    src.connect(f); f.connect(g); g.connect(this.musicBus);
+    src.connect(f);
+    f.connect(g);
+    g.connect(this.musicBus);
     src.start(t);
   }
 
-  /** One-shot effect. kind: shot | punch | crash | pickup | complete | click | skid | horn | busted */
+  /** One-shot effect. kind: shot | punch | crash | pickup | complete | click | horn | busted */
   sfx(kind, vol = 1) {
     if (!this.ctx || this.muted) return;
     const t = this.ctx.currentTime;
@@ -225,10 +233,13 @@ export class AudioEngine {
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     const f = this.ctx.createBiquadFilter();
-    f.type = 'lowpass'; f.frequency.value = cutoff;
+    f.type = 'lowpass';
+    f.frequency.value = cutoff;
     const g = this.ctx.createGain();
     g.gain.value = vol;
-    src.connect(f); f.connect(g); g.connect(this.master);
+    src.connect(f);
+    f.connect(g);
+    g.connect(this.master);
     src.start(t);
   }
 
