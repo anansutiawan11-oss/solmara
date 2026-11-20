@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOLMARA — Open-World Crime</title>
+<link rel="icon" href="data:,">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1210;
+    font-family: 'Segoe UI', Arial, sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; }
+  .hidden { display: none !important; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  .panel { background: rgba(12, 10, 18, 0.62); border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  /* Top-left: cash / rank / health */
+  #stats { position: absolute; top: 14px; left: 14px; min-width: 210px; }
+  #cash { font-size: 26px; font-weight: 800; color: #7dff8a; letter-spacing: 0.5px; }
+  #rank { font-size: 13px; color: #ffd21f; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
+  #health-bar { width: 100%; height: 9px; background: rgba(255,255,255,0.18); border-radius: 5px; margin-top: 7px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: #5fbf6b; border-radius: 5px; transition: width 0.2s; }
+  /* Top-right: wanted stars */
+  #wanted { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #stars { font-size: 26px; letter-spacing: 3px; color: #ffd21f; text-shadow: 0 0 8px rgba(255,210,31,0.6); }
+  #wanted-label { font-size: 11px; letter-spacing: 2px; color: #ccc; }
+  /* Top-centre: mission objective */
+  #objective-box { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    text-align: center; max-width: 46%; }
+  #objective { font-size: 16px; font-weight: 700; }
+  #objective-dist { font-size: 13px; color: #ffd21f; margin-top: 2px; }
+  /* Bottom-left: weapon / radio */
+  #loadout { position: absolute; left: 14px; bottom: 14px; }
+  #weapon { font-size: 16px; font-weight: 700; }
+  #ammo { font-size: 14px; color: #ffd21f; }
+  #radio { font-size: 13px; color: #9fd8ff; margin-top: 4px; }
+  /* Bottom-right: speed + minimap */
+  #speed { position: absolute; right: 14px; bottom: 214px; font-size: 30px; font-weight: 800;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.7); }
+  #minimap-wrap { position: absolute; right: 14px; bottom: 14px; border: 2px solid rgba(255,255,255,0.35);
+    border-radius: 10px; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,0.5); }
+  #minimap { display: block; width: 190px; height: 190px; }
+  /* Crosshair */
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px;
+    transform: translate(-50%, -50%); }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.9); }
+  #crosshair::before { left: 6px; top: 0; width: 2px; height: 14px; }
+  #crosshair::after { left: 0; top: 6px; width: 14px; height: 2px; }
+  /* Toast / prompt / banner / dialogue */
+  #toast { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%);
+    background: rgba(12,10,18,0.8); padding: 9px 18px; border-radius: 8px;
+    font-size: 15px; border: 1px solid rgba(255,210,31,0.4); white-space: nowrap; }
+  #prompt { position: absolute; left: 50%; bottom: 170px; transform: translateX(-50%);
+    background: rgba(12,10,18,0.8); padding: 8px 16px; border-radius: 8px; font-size: 14px; }
+  #banner { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; }
+  #banner-title { font-size: 34px; font-weight: 900; color: #ffd21f; letter-spacing: 2px;
+    text-shadow: 0 0 18px rgba(255,210,31,0.5); }
+  #banner-sub { font-size: 17px; margin-top: 6px; }
+  #dialogue { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%);
+    width: min(620px, 86%); background: rgba(12,10,18,0.85); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px; padding: 14px 18px; }
+  #dlg-speaker { color: #ffd21f; font-weight: 800; font-size: 14px; letter-spacing: 1px; }
+  #dlg-text { font-size: 17px; margin-top: 5px; line-height: 1.45; }
+  #dlg-hint { font-size: 12px; color: #aaa; margin-top: 8px; text-align: right; }
+  /* Full-screen overlays */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 20px; }
+  #title-overlay { background: linear-gradient(180deg, rgba(20,8,20,0.25) 0%, rgba(20,8,20,0.78) 100%); }
+  #title-overlay h1 { font-size: min(96px, 14vw); font-weight: 900; letter-spacing: 6px;
+    background: linear-gradient(180deg, #ffe9a0, #ff7a3c); -webkit-background-clip: text;
+    background-clip: text; color: transparent; text-shadow: 0 4px 30px rgba(255,122,60,0.35); }
+  #title-overlay .tagline { font-size: 19px; color: #ffd9a0; margin-top: 4px; letter-spacing: 2px; }
+  #title-overlay .controls { margin-top: 26px; font-size: 14px; line-height: 1.9; color: #ddd;
+    background: rgba(0,0,0,0.45); padding: 14px 22px; border-radius: 12px; }
+  #title-hint { margin-top: 22px; font-size: 17px; font-weight: 700; color: #ffd21f;
+    animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  #pause-overlay, #busted-overlay, #wasted-overlay, #story-end-overlay { background: rgba(8,6,12,0.82); }
+  .overlay h2 { font-size: 56px; font-weight: 900; letter-spacing: 4px; }
+  #busted-overlay h2 { color: #3a7bff; }
+  #wasted-overlay h2 { color: #e8574f; }
+  #story-end-overlay h2 { color: #ffd21f; }
+  .overlay p { font-size: 17px; color: #ddd; margin-top: 12px; line-height: 1.6; max-width: 560px; }
+  .overlay .key { margin-top: 24px; font-size: 15px; color: #ffd21f; font-weight: 700; }
+  #controls-hint { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: rgba(255,255,255,0.55); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+  <div id="stats" class="panel">
+    <div id="cash">$150</div>
+    <div id="rank">Street Rat</div>
+    <div id="health-bar"><div id="health-fill"></div></div>
+  </div>
+  <div id="wanted" class="panel">
+    <div id="stars">☆☆☆☆☆</div>
+    <div id="wanted-label">WANTED</div>
+  </div>
+  <div id="objective-box" class="panel">
+    <div id="objective">Welcome to Solmara</div>
+    <div id="objective-dist"></div>
+  </div>
+  <div id="loadout" class="panel">
+    <div id="weapon">Pistol</div>
+    <div id="ammo">12 / 12</div>
+    <div id="radio">♪ SOL 88.5 — Synthwave</div>
+  </div>
+  <div id="speed">—</div>
+  <div id="minimap-wrap"><canvas id="minimap" width="190" height="190"></canvas></div>
+  <div id="crosshair"></div>
+  <div id="toast" class="hidden"></div>
+  <div id="prompt" class="hidden"></div>
+  <div id="banner" class="hidden">
+    <div id="banner-title"></div>
+    <div id="banner-sub"></div>
+  </div>
+  <div id="dialogue" class="hidden">
+    <div id="dlg-speaker"></div>
+    <div id="dlg-text"></div>
+    <div id="dlg-hint">Enter — continue</div>
+  </div>
+  <div id="controls-hint">WASD move/drive · E enter car · F punch · K shoot · R reload · Space jump/handbrake · 1/2/3 radio · M mute · P pause</div>
+</div>
+
+<div id="title-overlay" class="overlay">
+  <h1>SOLMARA</h1>
+  <div class="tagline">A GOLDEN-HOUR OPEN-WORLD CRIME STORY</div>
+  <div class="controls">
+    WASD — move / drive &nbsp;·&nbsp; Mouse drag — camera<br>
+    E — enter / exit car &nbsp;·&nbsp; F — punch &nbsp;·&nbsp; K / Click — shoot<br>
+    Space — jump / handbrake &nbsp;·&nbsp; R — reload &nbsp;·&nbsp; 1/2/3 — radio &nbsp;·&nbsp; P — pause
+  </div>
+  <div id="title-hint">Press Enter to start</div>
+</div>
+
+<div id="pause-overlay" class="overlay hidden">
+  <h2>PAUSED</h2>
+  <p>Progress autosaved. The city waits for you, Mara.</p>
+  <div class="key">Press P or Esc to resume</div>
+</div>
+
+<div id="busted-overlay" class="overlay hidden">
+  <h2>BUSTED</h2>
+  <p>The Solmara PD caught you. Bail cost you $100. You wake up at the safehouse.</p>
+  <div class="key">Press Enter to get back out there</div>
+</div>
+
+<div id="wasted-overlay" class="overlay hidden">
+  <h2>WASTED</h2>
+  <p>That hurt. The hospital patched you up for $150.</p>
+  <div class="key">Press Enter to get back out there</div>
+</div>
+
+<div id="story-end-overlay" class="overlay hidden">
+  <h2>KING OF SOLMARA</h2>
+  <p>You did it, Mara. The city is yours now.</p>
+  <p>Final cash: <span id="end-cash">$0</span></p>
+  <div class="key">Press Enter to keep roaming free</div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
